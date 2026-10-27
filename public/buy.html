@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script>
+    /* Customize your store branding here. */
+    window.STORE_NAME = "YzY Store";
+    window.STORE_URL = "/";
+    document.addEventListener("DOMContentLoaded", function () {
+      document.querySelectorAll("[data-store-name]").forEach(function (el) { el.textContent = window.STORE_NAME; });
+      document.querySelectorAll("[data-store-url]").forEach(function (el) { el.setAttribute("href", window.STORE_URL); });
+    });
+  </script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Checkout — Pay with YzY · YzY Store</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@300;400;500;600&family=Caveat:wght@400;500;700&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --bg: #ffffff;
+      --ink: #000000;
+      --ink-soft: #555555;
+      --ink-faint: #aaaaaa;
+      --rule: rgba(0, 0, 0, 0.08);
+
+      /* kept under their original names so the inline style="color:var(--x)"
+         strings built by the script still resolve */
+      --muted: #555555;
+      --accent: #000000;
+      --err: #c0392b;
+      --input: #ffffff;
+      --border: rgba(0, 0, 0, 0.18);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+
+    body {
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "Hanken Grotesk", Helvetica, system-ui, -apple-system, sans-serif;
+      font-weight: 400;
+      font-size: 13px;
+      letter-spacing: 0.02em;
+      line-height: 1.5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 44px 24px 72px;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 420px;
+      animation: fadeUp 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: none; }
+    }
+
+    .sub {
+      font-family: "Caveat", cursive;
+      font-size: 20px;
+      color: var(--ink-soft);
+      margin-bottom: 4px;
+      transform: rotate(-1.5deg);
+      display: inline-block;
+    }
+    h1 {
+      font-size: 30px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      line-height: 1.05;
+      margin-bottom: 24px;
+    }
+
+    /* === ORDER SUMMARY === */
+    .product {
+      padding: 16px 0;
+      border-top: 1px solid var(--rule);
+      border-bottom: 1px solid var(--rule);
+      margin-bottom: 30px;
+      font-size: 13px;
+    }
+    .product strong {
+      color: var(--ink);
+      font-size: 15px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .product a {
+      color: var(--ink);
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      text-decoration: none;
+      border-bottom: 1px solid var(--ink);
+      padding-bottom: 2px;
+    }
+    .product a:hover { opacity: 0.55; }
+
+    /* === FORM === */
+    .section {
+      margin: 26px 0 14px;
+      font-size: 10px;
+      color: var(--ink-faint);
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+    }
+    .section:first-of-type { margin-top: 0; }
+
+    label {
+      display: block;
+      font-size: 10px;
+      color: var(--ink-faint);
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      margin: 0 0 2px;
+    }
+    .field { margin-bottom: 18px; }
+    .grid2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0 18px;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 5px 0 9px;
+      border: none;
+      border-bottom: 1px solid var(--border);
+      border-radius: 0;
+      background: var(--input);
+      color: var(--ink);
+      font-family: inherit;
+      font-size: 15px;
+      letter-spacing: 0.01em;
+      outline: none;
+      transition: border-color 0.2s ease;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    select {
+      background-image: linear-gradient(45deg, transparent 50%, var(--ink) 50%),
+                        linear-gradient(135deg, var(--ink) 50%, transparent 50%);
+      background-position: calc(100% - 9px) calc(50% + 1px), calc(100% - 4px) calc(50% + 1px);
+      background-size: 5px 5px, 5px 5px;
+      background-repeat: no-repeat;
+      padding-right: 22px;
+    }
+    input::placeholder { color: var(--ink-faint); }
+    input:focus, select:focus { border-bottom-color: var(--ink); }
+
+    .hint {
+      font-family: "Caveat", cursive;
+      font-size: 18px;
+      color: var(--ink-soft);
+      margin: 26px 0 10px;
+      transform: rotate(-1deg);
+      display: inline-block;
+    }
+
+    /* === SUBMIT — same button as "Buy now" on the shop === */
+    button.cta {
+      width: 100%;
+      margin-top: 4px;
+      padding: 18px;
+      background: var(--ink);
+      color: #fff;
+      border: none;
+      border-radius: 0;
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.22em;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.2s ease;
+    }
+    button.cta:hover { transform: translateY(-1px); }
+    button.cta:active { transform: translateY(0); }
+    button.cta::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.18) 50%, transparent 70%);
+      transform: translateX(-100%);
+      transition: transform 0.6s ease;
+    }
+    button.cta:hover::after { transform: translateX(100%); }
+    button.cta:disabled {
+      opacity: 0.45;
+      cursor: wait;
+      transform: none;
+    }
+    button.cta:disabled::after { display: none; }
+
+    /* === ERROR ===
+       The script replaces this element's textContent, so the marker is a
+       pseudo-element — a child node would be wiped on each update. */
+    .err {
+      display: none;
+      position: relative;
+      margin: 18px 0 0;
+      padding-left: 16px;
+      color: var(--err);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      line-height: 1.6;
+    }
+    .err.on { display: block; }
+    .err::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0.45em;
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--err);
+    }
+
+    .back {
+      display: inline-block;
+      margin-top: 28px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      color: var(--ink);
+      text-decoration: none;
+      border-bottom: 1px solid var(--ink);
+      padding-bottom: 3px;
+      transition: opacity 0.2s ease;
+    }
+    .back:hover { opacity: 0.55; }
+
+    .signature {
+      position: fixed;
+      bottom: 8px; left: 10px;
+      font-family: ui-serif, Georgia, serif;
+      font-size: 16px;
+      color: rgba(0,0,0,0.3);
+      z-index: 5;
+      pointer-events: none;
+      animation: breathe 5.5s ease-in-out infinite;
+    }
+    @keyframes breathe {
+      0%, 100% { opacity: 0.75; }
+      50% { opacity: 0.35; }
+    }
+
+    @media (max-width: 480px) {
+      body { padding: 30px 20px 60px; }
+      h1 { font-size: 26px; }
+      .grid2 { grid-template-columns: 1fr; gap: 0; }
+      button.cta { padding: 16px; }
+      .signature { bottom: 4px; left: 6px; font-size: 14px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <span class="sub" data-store-name>YzY Store</span>
+    <h1>Pay with $YzY</h1>
+
+    <div class="product" id="productBox">
+      Loading product…
+    </div>
+
+    <form id="buyForm" novalidate>
+      <div class="section">Contact</div>
+      <div class="field">
+        <label for="email">Email *</label>
+        <input id="email" name="email" type="email" autocomplete="email" required placeholder="you@example.com" />
+      </div>
+
+      <div class="section">Shipping</div>
+      <div class="grid2">
+        <div class="field">
+          <label for="firstName">First name *</label>
+          <input id="firstName" name="firstName" autocomplete="given-name" required />
+        </div>
+        <div class="field">
+          <label for="lastName">Last name *</label>
+          <input id="lastName" name="lastName" autocomplete="family-name" required />
+        </div>
+      </div>
+      <div class="field">
+        <label for="address1">Address *</label>
+        <input id="address1" name="address1" autocomplete="address-line1" required />
+      </div>
+      <div class="field">
+        <label for="address2">Address line 2</label>
+        <input id="address2" name="address2" autocomplete="address-line2" />
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label for="city">City *</label>
+          <input id="city" name="city" autocomplete="address-level2" required />
+        </div>
+        <div class="field">
+          <label for="province">State / province *</label>
+          <input id="province" name="province" autocomplete="address-level1" required placeholder="OR" />
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label for="zip">ZIP / postal *</label>
+          <input id="zip" name="zip" autocomplete="postal-code" required />
+        </div>
+        <div class="field">
+          <label for="country">Country *</label>
+          <select id="country" name="country" required>
+            <option value="US" selected>United States</option>
+            <option value="CA">Canada</option>
+            <option value="GB">United Kingdom</option>
+            <option value="AU">Australia</option>
+            <option value="DE">Germany</option>
+            <option value="FR">France</option>
+            <option value="JP">Japan</option>
+            <option value="MX">Mexico</option>
+          </select>
+        </div>
+      </div>
+
+      <p class="hint">next up — the live $YzY quote and QR</p>
+      <button class="cta" type="submit" id="submitBtn">Continue to Pay with $YzY</button>
+      <div class="err" id="errBox" role="alert"></div>
+    </form>
+
+    <a class="back" data-store-url href="/">Back to shop</a>
+  </div>
+
+  <span class="signature" aria-hidden="true">&#x20AA;</span>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    const errBox = document.getElementById("errBox");
+    const submitBtn = document.getElementById("submitBtn");
+    const productBox = document.getElementById("productBox");
+
+    function showError(msg) {
+      errBox.textContent = msg;
+      errBox.classList.add("on");
+    }
+    function clearError() {
+      errBox.textContent = "";
+      errBox.classList.remove("on");
+    }
+
+    function normalizeVariantId(raw) {
+      const s = String(raw || "").trim();
+      if (!s) return "";
+      if (s.startsWith("gid://")) return s;
+      if (/^\d+$/.test(s)) return "gid://shopify/ProductVariant/" + s;
+      return s;
+    }
+
+    const variantId = normalizeVariantId(
+      params.get("variantId") || params.get("variant") || "",
+    );
+    const quantity = Math.max(1, Math.min(20, Number(params.get("quantity") || 1) || 1));
+    const usdRaw = params.get("usdAmount") || params.get("price") || "";
+    const usdAmount = usdRaw !== "" ? Number(usdRaw) : NaN;
+    const title = (params.get("title") || "").trim();
+    const productUrl = (params.get("productUrl") || "").trim();
+
+    function isAllowedProductUrl(raw) {
+      try {
+        const u = new URL(raw, location.href);
+        /* Allow same-origin or any https product link (rendered as an escaped href only). */
+        if (u.origin === location.origin) return true;
+        return u.protocol === "https:";
+      } catch (_) {
+        return false;
+      }
+    }
+
+    (function renderProduct() {
+      productBox.textContent = "";
+      if (!variantId) {
+        const err = document.createElement("span");
+        err.style.color = "var(--err)";
+        err.textContent = "Missing variantId in URL";
+        productBox.appendChild(err);
+        return;
+      }
+
+      const nameEl = document.createElement("div");
+      const strong = document.createElement("strong");
+      strong.textContent = title || "Product";
+      nameEl.appendChild(strong);
+      productBox.appendChild(nameEl);
+
+      const meta = document.createElement("div");
+      meta.style.color = "var(--muted)";
+      meta.style.marginTop = "6px";
+      meta.textContent =
+        "Qty " +
+        quantity +
+        (Number.isFinite(usdAmount) && usdAmount > 0
+          ? " · $" + usdAmount.toFixed(2) + " USD"
+          : "");
+      productBox.appendChild(meta);
+
+      const vid = document.createElement("div");
+      vid.style.color = "var(--muted)";
+      vid.style.fontSize = ".7rem";
+      vid.style.letterSpacing = ".1em";
+      vid.style.marginTop = "6px";
+      vid.style.wordBreak = "break-all";
+      vid.textContent = variantId.replace(
+        /^gid:\/\/shopify\/ProductVariant\//,
+        "#",
+      );
+      productBox.appendChild(vid);
+
+      if (productUrl && isAllowedProductUrl(productUrl)) {
+        const wrap = document.createElement("div");
+        wrap.style.marginTop = "12px";
+        const a = document.createElement("a");
+        a.href = productUrl;
+        a.rel = "noopener noreferrer";
+        a.textContent = "Back to product";
+        wrap.appendChild(a);
+        productBox.appendChild(wrap);
+      }
+    })();
+
+    document.getElementById("buyForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      clearError();
+      if (!variantId) {
+        showError("Missing variantId query param.");
+        return;
+      }
+      if (!Number.isFinite(usdAmount) || usdAmount <= 0) {
+        showError("Missing or invalid usdAmount / price query param.");
+        return;
+      }
+      const email = document.getElementById("email").value.trim();
+      if (!email || !email.includes("@")) {
+        showError("Enter a valid email.");
+        return;
+      }
+      const shipping = {
+        firstName: document.getElementById("firstName").value.trim(),
+        lastName: document.getElementById("lastName").value.trim(),
+        address1: document.getElementById("address1").value.trim(),
+        address2: document.getElementById("address2").value.trim() || undefined,
+        city: document.getElementById("city").value.trim(),
+        province: document.getElementById("province").value.trim(),
+        zip: document.getElementById("zip").value.trim(),
+        country: document.getElementById("country").value.trim() || "US",
+      };
+      if (
+        !shipping.firstName ||
+        !shipping.lastName ||
+        !shipping.address1 ||
+        !shipping.city ||
+        !shipping.province ||
+        !shipping.zip
+      ) {
+        showError("Fill in all required shipping fields.");
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Creating checkout…";
+      try {
+        const res = await fetch("/intents", {
+          method: "POST",
+          headers: { "content-type": "application/json", accept: "application/json" },
+          body: JSON.stringify({
+            variantId,
+            quantity,
+            email,
+            usdAmount,
+            shipping,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data.error || "Failed to create payment intent (" + res.status + ")");
+        }
+        if (!data.payPageUrl) {
+          throw new Error("Intent created but payPageUrl missing");
+        }
+        location.href = data.payPageUrl;
+      } catch (err) {
+        showError(err instanceof Error ? err.message : String(err));
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Continue to Pay with $YzY";
+      }
+    });
+  </script>
+</body>
+</html>

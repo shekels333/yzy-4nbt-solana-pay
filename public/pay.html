@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script>
+    /* Customize your store branding here. */
+    window.STORE_NAME = "YzY Store";
+    window.STORE_URL = "/";
+    document.addEventListener("DOMContentLoaded", function () {
+      document.querySelectorAll("[data-store-name]").forEach(function (el) { el.textContent = window.STORE_NAME; });
+      document.querySelectorAll("[data-store-url]").forEach(function (el) { el.setAttribute("href", window.STORE_URL); });
+    });
+  </script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pay with YzY — YzY Store</title>
+
+  <!-- Font pairing: grotesk for UI, marker hand for accents -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@300;400;500;600&family=Caveat:wght@400;500;700&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --bg: #ffffff;
+      --ink: #000000;
+      --ink-soft: #555555;
+      --ink-faint: #aaaaaa;
+      --rule: rgba(0, 0, 0, 0.08);
+
+      /* kept under their original names so any inline style="color:var(--x)"
+         written by the script still resolves */
+      --muted: #555555;
+      --accent: #000000;
+      --ok: #00b341;
+      --warn: #d9a521;
+      --err: #c0392b;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+
+    body {
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "Hanken Grotesk", Helvetica, system-ui, -apple-system, sans-serif;
+      font-weight: 400;
+      font-size: 13px;
+      letter-spacing: 0.02em;
+      line-height: 1.5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 24px 64px;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 400px;
+      min-width: 0;
+      overflow-x: clip;
+      animation: fadeUp 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: none; }
+    }
+
+    .sub {
+      font-family: "Caveat", cursive;
+      font-size: 20px;
+      color: var(--ink-soft);
+      margin-bottom: 4px;
+      transform: rotate(-1.5deg);
+      display: inline-block;
+    }
+    h1 {
+      font-size: 30px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      line-height: 1.05;
+      margin-bottom: 26px;
+    }
+
+    /* === QR === */
+    #qr {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #fff;
+      border: 1px solid var(--rule);
+      padding: 18px;
+      margin: 0 auto 18px;
+      width: fit-content;
+      min-height: 276px;
+    }
+    #qr canvas, #qr img, #qr svg { display: block; width: 240px; height: 240px; }
+    #qr code {
+      font-family: inherit;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      color: var(--ink-faint);
+    }
+
+    /* === LIVE QUOTE BADGE === */
+    .live {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 18px;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      color: var(--ink-soft);
+    }
+    .live.on { display: flex; }
+    /* kill the trailing tracking so it reads "3s", not "3  s" */
+    #refreshLabel { letter-spacing: 0; }
+    .live .dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--ok);
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.35; }
+    }
+
+
+    /* === SESSION COUNTDOWN === */
+    .countdown {
+      display: none;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 16px;
+      margin: 0 0 14px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--rule);
+      font-variant-numeric: tabular-nums;
+    }
+    .countdown.on { display: flex; }
+    .countdown .cd-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--ink-faint);
+      white-space: nowrap;
+    }
+    .countdown .cd-time {
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--ink);
+      letter-spacing: 0.04em;
+    }
+    .countdown.warn .cd-time { color: var(--warn); }
+    .countdown.urgent .cd-time { color: var(--err); }
+    .countdown.done .cd-time { color: var(--err); }
+
+    #payActions.hidden,
+    #manualPay.hidden,
+    #qr.hidden,
+    .pay-note.hidden { display: none !important; }
+
+    #qr.expired {
+      min-height: 120px;
+      border-style: dashed;
+    }
+    #qr.expired code {
+      color: var(--err);
+      letter-spacing: 0.14em;
+      text-align: center;
+      max-width: 220px;
+      line-height: 1.6;
+    }
+
+    /* === QUOTE ROWS === */
+    .row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 16px;
+      padding: 11px 0;
+      border-bottom: 1px solid var(--rule);
+      min-width: 0;
+      max-width: 100%;
+    }
+    .row:first-of-type { border-top: 1px solid var(--rule); }
+    .row span:first-child {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--ink-faint);
+      white-space: nowrap;
+    }
+    .row span:last-child {
+      color: var(--ink);
+      font-variant-numeric: tabular-nums;
+      text-align: right;
+      word-break: break-all;
+    }
+    /* CA — full mint on one line (small type), tap to copy */
+    .row.ca-row {
+      align-items: baseline;
+      min-width: 0;
+    }
+    .row .ca-copy {
+      appearance: none;
+      -webkit-appearance: none;
+      background: none;
+      border: 0;
+      padding: 0;
+      margin: 0;
+      box-sizing: border-box;
+      flex: 1 1 0;
+      min-width: 0;
+      max-width: 100%;
+      display: block;
+      color: var(--ink);
+      font-family: inherit;
+      /* ~44-char mint fits ~280–320px content at ~9.5–10.5px */
+      font-size: 10px;
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0;
+      line-height: 1.35;
+      text-align: right;
+      text-transform: none;
+      white-space: nowrap;
+      overflow-x: auto;
+      overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      cursor: pointer;
+      transition: opacity 0.15s ease;
+    }
+    .row .ca-copy::-webkit-scrollbar { display: none; }
+    .row .ca-copy #mint {
+      display: inline;
+      color: inherit;
+      font: inherit;
+      font-weight: inherit;
+      white-space: nowrap;
+      overflow-wrap: normal;
+      word-break: normal;
+    }
+    .row .ca-copy:hover { opacity: 0.7; }
+    .row .ca-copy:focus-visible {
+      outline: 1px solid var(--ink);
+      outline-offset: 3px;
+    }
+    .row .ca-copy .ca-hint {
+      display: block;
+      margin-top: 4px;
+      font-size: 9px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      color: var(--ok);
+      min-height: 1.2em;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+    .row .ca-copy .ca-hint.on { opacity: 1; }
+    /* the two headline numbers carry a little more weight */
+    #usd, #amount { font-size: 15px; font-weight: 500; }
+
+    /* === STATUS ===
+       The script replaces this element's textContent, so the indicator
+       is a pseudo-element — a child <span> would be wiped on each update. */
+    .status {
+      position: relative;
+      margin-top: 20px;
+      padding-left: 16px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--ink-soft);
+      line-height: 1.6;
+    }
+    .status::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0.45em;
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--ink-faint);
+    }
+    .status.wait::before { background: var(--warn); animation: pulse 2s ease-in-out infinite; }
+    .status.ok::before   { background: var(--ok); }
+    .status.err::before  { background: var(--err); }
+    .status.ok  { color: var(--ink); }
+    .status.err { color: var(--err); }
+
+
+    /* === MANUAL FALLBACK (secondary) === */
+    .manual {
+      display: none;
+      margin-top: 28px;
+      padding-top: 22px;
+      border-top: 1px solid var(--rule);
+    }
+    .manual.on { display: block; }
+    .manual.hidden { display: none !important; }
+    .manual .manual-kicker {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      color: var(--ink-faint);
+      margin-bottom: 8px;
+    }
+    .manual .manual-title {
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      color: var(--ink);
+      line-height: 1.45;
+      margin-bottom: 14px;
+    }
+    .manual .manual-title strong {
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+    .manual .copy-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+      padding: 11px 0;
+      border-bottom: 1px solid var(--rule);
+      min-width: 0;
+    }
+    .manual .copy-row:first-of-type { border-top: 1px solid var(--rule); }
+    .manual .copy-row .lbl {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--ink-faint);
+      white-space: nowrap;
+      flex: 0 0 auto;
+    }
+    .manual .copy-btn {
+      appearance: none;
+      -webkit-appearance: none;
+      background: none;
+      border: 0;
+      padding: 0;
+      margin: 0;
+      box-sizing: border-box;
+      flex: 1 1 0;
+      min-width: 0;
+      max-width: 100%;
+      display: block;
+      color: var(--ink);
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0;
+      line-height: 1.35;
+      text-align: right;
+      text-transform: none;
+      white-space: nowrap;
+      overflow-x: auto;
+      overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      cursor: pointer;
+      transition: opacity 0.15s ease;
+    }
+    .manual .copy-btn::-webkit-scrollbar { display: none; }
+    .manual .copy-btn:hover { opacity: 0.7; }
+    .manual .copy-btn:focus-visible {
+      outline: 1px solid var(--ink);
+      outline-offset: 3px;
+    }
+    .manual .copy-btn .copy-val {
+      display: inline;
+      color: inherit;
+      font: inherit;
+      white-space: nowrap;
+    }
+    .manual .copy-btn .copy-hint {
+      display: block;
+      margin-top: 4px;
+      font-size: 9px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      color: var(--ok);
+      min-height: 1.2em;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+    .manual .copy-btn .copy-hint.on { opacity: 1; }
+    .manual .manual-note {
+      margin-top: 12px;
+      font-size: 10px;
+      line-height: 1.55;
+      letter-spacing: 0.02em;
+      color: var(--ink-soft);
+    }
+    .manual .manual-note em {
+      font-style: normal;
+      color: var(--ink);
+      font-weight: 500;
+    }
+
+    /* === OPEN IN WALLET — same button as "Buy now" on the shop === */
+    a.link {
+      display: block;
+      width: 100%;
+      margin-top: 22px;
+      padding: 18px;
+      background: var(--ink);
+      color: #fff;
+      text-align: center;
+      text-decoration: none;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.22em;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.2s ease;
+      word-break: normal;
+    }
+    a.link:hover { transform: translateY(-1px); }
+    a.link:active { transform: translateY(0); }
+    a.link::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.18) 50%, transparent 70%);
+      transform: translateX(-100%);
+      transition: transform 0.6s ease;
+    }
+    a.link:hover::after { transform: translateX(100%); }
+
+    .pay-note {
+      display: block;
+      font-family: "Caveat", cursive;
+      font-size: 18px;
+      color: var(--ink-soft);
+      margin-top: 12px;
+      transform: rotate(-1deg);
+    }
+
+    .footer-links {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px 20px;
+      margin-top: 26px;
+    }
+    .back {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      color: var(--ink);
+      text-decoration: none;
+      border-bottom: 1px solid var(--ink);
+      padding-bottom: 3px;
+      transition: opacity 0.2s ease;
+    }
+    .back:hover { opacity: 0.55; }
+
+    .signature {
+      position: fixed;
+      bottom: 8px; left: 10px;
+      font-family: ui-serif, Georgia, serif;
+      font-size: 16px;
+      color: rgba(0,0,0,0.3);
+      z-index: 5;
+      pointer-events: none;
+      animation: breathe 5.5s ease-in-out infinite;
+    }
+    @keyframes breathe {
+      0%, 100% { opacity: 0.75; }
+      50% { opacity: 0.35; }
+    }
+
+    @media (max-width: 480px) {
+      body { padding: 28px 20px 56px; }
+      h1 { font-size: 26px; }
+      #qr { padding: 14px; min-height: 268px; }
+      a.link { padding: 16px; }
+      .signature { bottom: 4px; left: 6px; font-size: 14px; }
+      .row .ca-copy { font-size: 9.5px; }
+    }
+    @media (max-width: 360px) {
+      .row .ca-copy { font-size: 8.5px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <span class="sub" data-store-name>YzY Store</span>
+    <h1>Pay with $YzY</h1>
+
+    <div id="qr"><code>loading…</code></div>
+
+    <p class="live" id="liveBadge"><span class="dot"></span>Live quote · refreshes every <span id="refreshLabel">3</span>s</p>
+
+    <div class="countdown" id="countdown" aria-live="polite">
+      <span class="cd-label">Pay within</span>
+      <span class="cd-time" id="countdownTime">—</span>
+    </div>
+
+    <div class="row"><span>USD</span><span id="usd">—</span></div>
+    <div class="row"><span>YzY price</span><span id="price">—</span></div>
+    <div class="row"><span>Amount</span><span id="amount">—</span></div>
+    <div class="row"><span>Status</span><span id="statusLabel">—</span></div>
+
+    <div id="statusBox" class="status wait">Waiting for wallet payment…</div>
+
+    <div id="payActions">
+      <a class="link" id="deepLink" href="#" target="_blank" rel="noopener">Open in wallet</a>
+      <span class="pay-note">scan the code, or tap to open your wallet</span>
+    </div>
+
+    <div id="manualPay" class="manual" aria-label="Manual YzY transfer fallback">
+      <p class="manual-kicker">Backup option</p>
+      <p class="manual-title">Or send <strong id="manualAmount">—</strong> to the receive address below</p>
+      <div class="copy-row">
+        <span class="lbl">Amount</span>
+        <button type="button" class="copy-btn" id="amountCopy" data-copy="" title="Copy amount">
+          <span class="copy-val" id="amountCopyVal">—</span>
+          <span class="copy-hint" id="amountCopyHint" aria-live="polite"></span>
+        </button>
+      </div>
+      <div class="copy-row">
+        <span class="lbl">Receive address</span>
+        <button type="button" class="copy-btn" id="walletCopy" data-copy="" title="Copy receive address">
+          <span class="copy-val" id="walletCopyVal">—</span>
+          <span class="copy-hint" id="walletCopyHint" aria-live="polite"></span>
+        </button>
+      </div>
+      <p class="manual-note">
+        Prefer the QR or <em>Open in wallet</em> when you can — they include a payment reference.
+        This plain send is only if Solana Pay scan/open fails. Send the exact amount within the countdown;
+        wrong amount or a late send after expiry may not confirm.
+      </p>
+    </div>
+
+    <nav class="footer-links" aria-label="Pay page links">
+      <a class="back" data-store-url href="/">Back to shop</a>
+      <a class="back" href="https://jup.ag/tokens/4NBTf8PfLH4oLFnwf3knv46FY9i5oXjDxffCetXRpump" target="_blank" rel="noopener noreferrer">Buy YzY 4NBT</a>
+    </nav>
+  </div>
+
+  <span class="signature" aria-hidden="true">&#x20AA;</span>
+
+  <script src="/vendor/qrcode-generator.js"></script>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const intentId = params.get("intent");
+    const statusBox = document.getElementById("statusBox");
+    const statusLabel = document.getElementById("statusLabel");
+    const countdownEl = document.getElementById("countdown");
+    const countdownTimeEl = document.getElementById("countdownTime");
+    const payActionsEl = document.getElementById("payActions");
+    const manualPayEl = document.getElementById("manualPay");
+
+    let lastPayUrl = "";
+    let quoteRefreshMs = 3000;
+    let stopped = false;
+    let quoteTimer = null;
+    let confirmTimer = null;
+    let countdownTimer = null;
+    let expiresAtMs = null;
+
+    function setStatus(kind, text, label) {
+      statusBox.className = "status " + kind;
+      statusBox.textContent = text;
+      if (label) statusLabel.textContent = label;
+    }
+
+    function fmtUsd(n) {
+      if (n == null || !Number.isFinite(Number(n))) return "—";
+      const x = Number(n);
+      if (x >= 0.01) return "$" + x.toFixed(2);
+      return "$" + x.toPrecision(4);
+    }
+
+    function fmtPrice(n) {
+      if (n == null || !Number.isFinite(Number(n))) return "—";
+      return "$" + Number(n).toPrecision(4) + " / YzY";
+    }
+
+    function parseExpiresAt(value) {
+      if (value == null) return null;
+      if (typeof value === "number" && Number.isFinite(value)) return value;
+      if (typeof value === "string" && value.trim()) {
+        const asNum = Number(value);
+        if (Number.isFinite(asNum)) return asNum;
+        const asDate = Date.parse(value);
+        if (Number.isFinite(asDate)) return asDate;
+      }
+      return null;
+    }
+
+    function fmtRemain(ms) {
+      const total = Math.max(0, Math.ceil(ms / 1000));
+      const m = Math.floor(total / 60);
+      const s = total % 60;
+      return m + ":" + String(s).padStart(2, "0");
+    }
+
+    function stopPolling() {
+      stopped = true;
+      if (quoteTimer) { clearTimeout(quoteTimer); quoteTimer = null; }
+      if (confirmTimer) { clearTimeout(confirmTimer); confirmTimer = null; }
+      if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+    }
+
+    function showExpiredUi() {
+      const qrEl = document.getElementById("qr");
+      qrEl.classList.add("expired");
+      qrEl.textContent = "";
+      const code = document.createElement("code");
+      code.textContent = "Session expired";
+      qrEl.appendChild(code);
+      lastPayUrl = "";
+      if (payActionsEl) payActionsEl.classList.add("hidden");
+      if (manualPayEl) {
+        manualPayEl.classList.add("hidden");
+        manualPayEl.classList.remove("on");
+      }
+      document.getElementById("liveBadge").classList.remove("on");
+      if (countdownEl) {
+        countdownEl.classList.add("on", "done");
+        countdownEl.classList.remove("warn", "urgent");
+      }
+      if (countdownTimeEl) countdownTimeEl.textContent = "0:00";
+    }
+
+    function markExpired(_fromServer) {
+      if (stopped && statusLabel.textContent === "expired") return;
+      stopPolling();
+      showExpiredUi();
+      setStatus(
+        "err",
+        "Session expired — start a new checkout from the shop. Do not send YzY.",
+        "expired",
+      );
+    }
+
+    function tickCountdown() {
+      if (expiresAtMs == null) return;
+      const remain = expiresAtMs - Date.now();
+      if (countdownEl) countdownEl.classList.add("on");
+      if (countdownTimeEl) countdownTimeEl.textContent = fmtRemain(remain);
+      if (countdownEl) {
+        countdownEl.classList.remove("warn", "urgent", "done");
+        if (remain <= 0) countdownEl.classList.add("done");
+        else if (remain <= 60_000) countdownEl.classList.add("urgent");
+        else if (remain <= 120_000) countdownEl.classList.add("warn");
+      }
+      if (remain <= 0) {
+        markExpired(false);
+      }
+    }
+
+    function startCountdown(expiresAt) {
+      const ms = parseExpiresAt(expiresAt);
+      if (ms == null) {
+        expiresAtMs = null;
+        if (countdownEl) countdownEl.classList.remove("on");
+        return;
+      }
+      expiresAtMs = ms;
+      if (countdownTimer) clearInterval(countdownTimer);
+      tickCountdown();
+      if (!stopped) {
+        countdownTimer = setInterval(tickCountdown, 250);
+      }
+    }
+
+    function renderQr(url) {
+      if (!url || stopped) return;
+      if (url === lastPayUrl) return;
+      lastPayUrl = url;
+      const qrEl = document.getElementById("qr");
+      qrEl.classList.remove("expired");
+      qrEl.textContent = "";
+      if (payActionsEl) payActionsEl.classList.remove("hidden");
+      if (manualPayEl) {
+        manualPayEl.classList.remove("hidden");
+        manualPayEl.classList.add("on");
+      }
+      document.getElementById("deepLink").href = url;
+      try {
+        if (typeof qrcode !== "function") {
+          throw new Error("qrcode library missing");
+        }
+        // typeNumber 0 = auto size; error correction M.
+        const qr = qrcode(0, "M");
+        qr.addData(url);
+        qr.make();
+        // Scalable SVG — CSS locks to 240×240 inside white pad (same look as before).
+        const svg = qr.createSvgTag({
+          scalable: true,
+          margin: 2,
+          alt: "Solana Pay QR",
+        });
+        qrEl.innerHTML = svg;
+        const el = qrEl.querySelector("svg");
+        if (el) {
+          el.setAttribute("role", "img");
+          el.setAttribute("aria-label", "Solana Pay QR");
+        }
+      } catch (err) {
+        console.error("[pay] QR render failed", err);
+        const code = document.createElement("code");
+        code.textContent = "QR failed — use Open in wallet";
+        qrEl.appendChild(code);
+      }
+    }
+
+    const copyHintTimers = Object.create(null);
+    async function copyText(value, hintEl, timerKey) {
+      if (!value || value === "—") return;
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(value);
+        } else {
+          const ta = document.createElement("textarea");
+          ta.value = value;
+          ta.setAttribute("readonly", "");
+          ta.style.position = "fixed";
+          ta.style.left = "-9999px";
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand("copy");
+          document.body.removeChild(ta);
+        }
+        if (hintEl) {
+          hintEl.textContent = "Copied";
+          hintEl.classList.add("on");
+          if (copyHintTimers[timerKey]) clearTimeout(copyHintTimers[timerKey]);
+          copyHintTimers[timerKey] = setTimeout(() => {
+            hintEl.classList.remove("on");
+            hintEl.textContent = "";
+          }, 1600);
+        }
+      } catch (err) {
+        console.error("[pay] copy failed", err);
+        if (hintEl) {
+          hintEl.textContent = "Copy failed";
+          hintEl.classList.add("on");
+        }
+      }
+    }
+
+    function wireCopyButton(btnId, hintId, timerKey) {
+      const btn = document.getElementById(btnId);
+      if (!btn) return;
+      btn.addEventListener("click", () => {
+        const hint = document.getElementById(hintId);
+        const value = (btn.dataset.copy || "").trim();
+        copyText(value, hint, timerKey);
+      });
+    }
+    wireCopyButton("amountCopy", "amountCopyHint", "amount");
+    wireCopyButton("walletCopy", "walletCopyHint", "wallet");
+    // Legacy CA copy (element removed from DOM; keep no-op safe)
+    wireCopyButton("caCopy", "caHint", "ca");
+
+    function applyIntent(data) {
+      const amountStr =
+        data.amount != null && Number.isFinite(Number(data.amount))
+          ? String(data.amount)
+          : "";
+      const amountLabel = amountStr ? amountStr + " YzY" : "—";
+      document.getElementById("amount").textContent = amountLabel;
+      document.getElementById("usd").textContent =
+        data.usdAmount != null ? fmtUsd(data.usdAmount) : "—";
+      document.getElementById("price").textContent = fmtPrice(data.priceUsd);
+      const mintEl = document.getElementById("mint");
+      const ca = data.mint || "4NBTf8PfLH4oLFnwf3knv46FY9i5oXjDxffCetXRpump";
+      if (mintEl) mintEl.textContent = ca;
+      const caBtn = document.getElementById("caCopy");
+      if (caBtn) caBtn.dataset.ca = ca;
+
+      const merchant =
+        data.merchantWallet ||
+        data.recipient ||
+        data.merchant ||
+        "";
+      const manualAmountEl = document.getElementById("manualAmount");
+      if (manualAmountEl) manualAmountEl.textContent = amountLabel;
+      const amountCopyBtn = document.getElementById("amountCopy");
+      const amountCopyVal = document.getElementById("amountCopyVal");
+      if (amountCopyBtn) amountCopyBtn.dataset.copy = amountStr;
+      if (amountCopyVal) amountCopyVal.textContent = amountLabel;
+      const walletCopyBtn = document.getElementById("walletCopy");
+      const walletCopyVal = document.getElementById("walletCopyVal");
+      if (walletCopyBtn) walletCopyBtn.dataset.copy = merchant;
+      if (walletCopyVal) walletCopyVal.textContent = merchant || "—";
+      if (manualPayEl) {
+        const showManual =
+          data.status === "pending" &&
+          Boolean(amountStr) &&
+          Boolean(merchant) &&
+          !manualPayEl.classList.contains("hidden");
+        if (showManual) manualPayEl.classList.add("on");
+        else if (data.status !== "pending") {
+          manualPayEl.classList.remove("on");
+          manualPayEl.classList.add("hidden");
+        }
+      }
+      statusLabel.textContent = data.status;
+
+      if (typeof data.quoteRefreshMs === "number" && data.quoteRefreshMs > 0) {
+        quoteRefreshMs = data.quoteRefreshMs;
+        document.getElementById("refreshLabel").textContent = String(
+          Math.round(quoteRefreshMs / 1000 * 10) / 10,
+        );
+      }
+
+      const expiredByClock =
+        parseExpiresAt(data.expiresAt) != null &&
+        Date.now() >= parseExpiresAt(data.expiresAt);
+      const isPending = data.status === "pending" && !expiredByClock;
+
+      if (data.expiresAt != null) startCountdown(data.expiresAt);
+
+      const live = document.getElementById("liveBadge");
+      if (data.liveQuote && isPending) {
+        live.classList.add("on");
+      } else {
+        live.classList.remove("on");
+      }
+
+      if (data.status === "expired" || expiredByClock) {
+        return false;
+      }
+      if (data.status === "confirmed") {
+        if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+        if (countdownEl) countdownEl.classList.remove("on");
+        return false;
+      }
+      return renderQr(data.solanaPayUrl);
+    }
+
+    function isExpiredPayload(data, res) {
+      if (!data) return false;
+      if (data.status === "expired") return true;
+      if (res && res.status === 410) return true;
+      const exp = parseExpiresAt(data.expiresAt);
+      return exp != null && Date.now() >= exp && data.status === "pending";
+    }
+
+    async function load() {
+      if (!intentId) {
+        setStatus("err", "Missing ?intent= in URL", "error");
+        return;
+      }
+      const res = await fetch("/intents/" + encodeURIComponent(intentId));
+      if (!res.ok) {
+        setStatus("err", "Intent not found", "error");
+        return;
+      }
+      const data = await res.json();
+      await applyIntent(data);
+
+      if (data.status === "confirmed") {
+        stopPolling();
+        setStatus("ok", "Payment confirmed. Thank you!", "confirmed");
+        return;
+      }
+      if (isExpiredPayload(data, res) || data.status === "expired") {
+        markExpired(true);
+        return;
+      }
+      if (data.status !== "pending") {
+        stopPolling();
+        setStatus("err", "Intent is " + data.status, data.status);
+        return;
+      }
+      setStatus("wait", "Waiting for wallet payment…", "pending");
+      scheduleQuoteRefresh();
+      scheduleConfirm();
+    }
+
+    function scheduleQuoteRefresh() {
+      if (quoteTimer) clearTimeout(quoteTimer);
+      quoteTimer = setTimeout(refreshQuote, quoteRefreshMs);
+    }
+
+    async function refreshQuote() {
+      if (stopped) return;
+      try {
+        const res = await fetch("/intents/" + encodeURIComponent(intentId));
+        if (!res.ok) {
+          scheduleQuoteRefresh();
+          return;
+        }
+        const data = await res.json();
+        if (data.status === "confirmed") {
+          stopPolling();
+          await applyIntent(data);
+          setStatus(
+            "ok",
+            "Payment confirmed. Signature " + (data.signature || "").slice(0, 12) + "…",
+            "confirmed",
+          );
+          return;
+        }
+        if (isExpiredPayload(data, res) || data.status === "expired") {
+          await applyIntent(data);
+          markExpired(true);
+          return;
+        }
+        if (data.status !== "pending") {
+          stopPolling();
+          await applyIntent(data);
+          setStatus("err", "Intent is " + data.status, data.status);
+          return;
+        }
+        const prev = lastPayUrl;
+        await applyIntent(data);
+        if (stopped) return;
+        if (data.quoteChanged || (data.solanaPayUrl && data.solanaPayUrl !== prev)) {
+          setStatus(
+            "wait",
+            "Price updated — scan the new QR / amount",
+            "pending",
+          );
+        }
+      } catch (e) {
+        /* keep polling */
+      }
+      if (!stopped) scheduleQuoteRefresh();
+    }
+
+    function scheduleConfirm() {
+      if (confirmTimer) clearTimeout(confirmTimer);
+      confirmTimer = setTimeout(pollConfirm, 4000);
+    }
+
+    async function pollConfirm() {
+      if (stopped) return;
+      try {
+        const res = await fetch(
+          "/intents/" + encodeURIComponent(intentId) + "/confirm",
+          { method: "POST" },
+        );
+        const data = await res.json().catch(function () { return {}; });
+        if (data.status === "confirmed") {
+          stopPolling();
+          await applyIntent(data);
+          setStatus(
+            "ok",
+            "Payment confirmed. Signature " + (data.signature || "").slice(0, 12) + "…",
+            "confirmed",
+          );
+          return;
+        }
+        if (res.status === 410 || isExpiredPayload(data, res) || data.status === "expired") {
+          markExpired(true);
+          return;
+        }
+        if (!statusBox.textContent.includes("Price updated")) {
+          setStatus("wait", "Waiting for wallet payment…", data.status || "pending");
+        }
+      } catch (e) {
+        if (!stopped) setStatus("wait", "Checking… (network blip)", "pending");
+      }
+      if (!stopped) scheduleConfirm();
+    }
+
+    load().catch((e) => setStatus("err", String(e), "error"));
+  </script>
+</body>
+</html>

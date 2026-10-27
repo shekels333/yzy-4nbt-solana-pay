@@ -1,0 +1,9 @@
+# Nixpacks / Railway fallback when not using Dockerfile
+[phases.setup]
+nixPkgs = ["nodejs_20", "python3", "gcc"]
+
+[phases.install]
+cmds = ["npm ci"]
+
+[start]
+cmd = "npm start"

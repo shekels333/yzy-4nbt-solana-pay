@@ -1,0 +1,46 @@
+{
+  "name": "yzy-4nbt-solana-pay",
+  "version": "0.1.0",
+  "private": false,
+  "description": "DIY Solana Pay checkout for the YzY (4NBT) community token + Shopify draft orders",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc",
+    "intent:draft": "tsx scripts/create-intent-for-draft.ts"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@solana/pay": "^0.2.5",
+    "@solana/web3.js": "^1.95.4",
+    "better-sqlite3": "^11.7.0",
+    "bignumber.js": "^9.1.2",
+    "bs58": "^6.0.0",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "tsx": "^4.19.2"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2"
+  },
+  "allowScripts": {
+    "better-sqlite3@11.10.0": true,
+    "esbuild@0.28.2": true,
+    "bigint-buffer@1.1.5": true,
+    "bufferutil@4.1.0": true,
+    "utf-8-validate@6.0.6": true,
+    "utf-8-validate@5.0.10": true
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/shekels333/yzy-4nbt-solana-pay.git"
+  }
+}

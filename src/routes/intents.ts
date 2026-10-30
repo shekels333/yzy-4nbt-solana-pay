@@ -178,7 +178,7 @@ async function resolveShipping(
   if (!q.rate) {
     return {
       ok: false,
-      error: `Sorry, we can't ship this item to ${shipping.country ?? "that country"} yet.`,
+      error: "Sorry — we currently ship to the US only.",
     };
   }
   return { ok: true, line: { title: q.rate.title, priceUsd: roundUsd(q.rate.priceUsd) } };

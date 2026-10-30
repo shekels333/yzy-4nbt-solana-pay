@@ -34,6 +34,8 @@ export interface DraftOrderInput {
   shipping: ShippingFields;
   note?: string;
   tags?: string[];
+  /** Server-computed shipping charge (from calculateShipping). */
+  shippingLine?: { title: string; priceUsd: number } | null;
 }
 
 export interface DraftOrderResult {
@@ -289,6 +291,14 @@ export async function createDraftOrder(
           quantity: input.quantity,
         },
       ],
+      ...(input.shippingLine
+        ? {
+            shippingLine: {
+              title: input.shippingLine.title,
+              price: input.shippingLine.priceUsd.toFixed(2),
+            },
+          }
+        : {}),
       shippingAddress: {
         firstName: shipping.firstName,
         lastName: shipping.lastName,
@@ -610,4 +620,78 @@ export async function annotateDraftPaid(
     return;
   }
   await completeDraftOrder(draftOrderId, signature);
+}
+
+
+export interface ShippingQuote {
+  /** False when no line item needs shipping (digital etc.) → $0. */
+  requiresShipping: boolean;
+  /** Null when shipping is required but Shopify offers no rate for the address. */
+  rate: { title: string; priceUsd: number } | null;
+}
+
+/**
+ * Server-authoritative shipping: ask Shopify which rates checkout would offer
+ * for this variant/qty/address (draftOrderCalculate creates nothing) and pick
+ * the cheapest one. Same delivery profiles as card checkout.
+ */
+export async function calculateShipping(
+  variantId: string,
+  quantity: number,
+  shipping: ShippingFields,
+): Promise<ShippingQuote> {
+  if (!shopifyEnabled) {
+    return { requiresShipping: false, rate: null };
+  }
+  const id = variantId.startsWith("gid://")
+    ? variantId
+    : `gid://shopify/ProductVariant/${variantId}`;
+  const mutation = `
+    mutation calcShipping($input: DraftOrderInput!) {
+      draftOrderCalculate(input: $input) {
+        calculatedDraftOrder {
+          lineItems { requiresShipping }
+          availableShippingRates { title price { amount } }
+        }
+        userErrors { field message }
+      }
+    }
+  `;
+  const json = await shopifyGraphql<{
+    data?: {
+      draftOrderCalculate?: {
+        calculatedDraftOrder?: {
+          lineItems: { requiresShipping: boolean }[];
+          availableShippingRates: { title: string; price: { amount: string } }[];
+        } | null;
+        userErrors?: { field: string[]; message: string }[];
+      };
+    };
+    errors?: { message: string }[];
+  }>(mutation, {
+    input: {
+      lineItems: [{ variantId: id, quantity }],
+      shippingAddress: {
+        address1: shipping.address1,
+        address2: shipping.address2,
+        city: shipping.city,
+        province: shipping.province,
+        country: shipping.country ?? "US",
+        zip: shipping.zip,
+      },
+    },
+  });
+  const errs = json.errors ?? json.data?.draftOrderCalculate?.userErrors ?? [];
+  if (errs.length) {
+    throw new Error(`Shopify draftOrderCalculate errors: ${JSON.stringify(errs)}`);
+  }
+  const calc = json.data?.draftOrderCalculate?.calculatedDraftOrder;
+  if (!calc) throw new Error("Shopify returned no calculated draft");
+  const requiresShipping = calc.lineItems.some((li) => li.requiresShipping);
+  if (!requiresShipping) return { requiresShipping: false, rate: null };
+  const rates = calc.availableShippingRates
+    .map((r) => ({ title: r.title, priceUsd: Number(r.price.amount) }))
+    .filter((r) => Number.isFinite(r.priceUsd) && r.priceUsd >= 0)
+    .sort((a, b) => a.priceUsd - b.priceUsd);
+  return { requiresShipping: true, rate: rates[0] ?? null };
 }

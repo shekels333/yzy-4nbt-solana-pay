@@ -345,6 +345,12 @@
 
   <span class="signature" aria-hidden="true">&#x20AA;</span>
 
+      <div class="field" id="totalsBox" style="font-size:.85rem;line-height:1.7">
+        <div>Item: <span id="tItems">—</span></div>
+        <div>Shipping: <span id="tShip">enter your address</span></div>
+        <div><strong>Total: <span id="tTotal">—</span></strong></div>
+      </div>
+
   <script>
     const params = new URLSearchParams(location.search);
     const errBox = document.getElementById("errBox");
@@ -452,6 +458,61 @@
       }
       const email = document.getElementById("email").value.trim();
       if (!email || !email.includes("@")) {
+
+    // --- Live shipping preview (server-authoritative; final total is set when the checkout is created) ---
+    const tItems = document.getElementById("tItems");
+    const tShip = document.getElementById("tShip");
+    const tTotal = document.getElementById("tTotal");
+    const fmt = (n) => "$" + Number(n).toFixed(2);
+    if (Number.isFinite(usdAmount) && usdAmount > 0) tItems.textContent = fmt(usdAmount);
+    let quoteTimer = null;
+    let quoteSeq = 0;
+    function readAddress() {
+      return {
+        address1: document.getElementById("address1").value.trim(),
+        address2: document.getElementById("address2").value.trim() || undefined,
+        city: document.getElementById("city").value.trim(),
+        province: document.getElementById("province").value.trim(),
+        zip: document.getElementById("zip").value.trim(),
+        country: document.getElementById("country").value.trim() || "US",
+      };
+    }
+    async function refreshShippingQuote() {
+      if (!variantId) return;
+      const addr = readAddress();
+      const seq = ++quoteSeq;
+      tShip.textContent = "calculating…";
+      try {
+        const res = await fetch("/intents/shipping-quote", {
+          method: "POST",
+          headers: { "content-type": "application/json", accept: "application/json" },
+          body: JSON.stringify({ variantId, quantity, shipping: addr }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (seq !== quoteSeq) return;
+        if (data.itemsUsd != null) tItems.textContent = fmt(data.itemsUsd);
+        if (!res.ok) {
+          tShip.textContent = data.error || "unavailable";
+          tTotal.textContent = "—";
+          return;
+        }
+        tShip.textContent =
+          data.shippingUsd > 0 ? fmt(data.shippingUsd) + (data.shippingTitle ? " (" + data.shippingTitle + ")" : "") : "Free";
+        tTotal.textContent = fmt(data.totalUsd) + " USD (paid in $YzY)";
+      } catch (_) {
+        if (seq === quoteSeq) tShip.textContent = "unavailable";
+      }
+    }
+    function scheduleQuote() {
+      clearTimeout(quoteTimer);
+      quoteTimer = setTimeout(refreshShippingQuote, 400);
+    }
+    ["country", "zip", "province", "city"].forEach((id) => {
+      const el = document.getElementById(id);
+      el.addEventListener("change", scheduleQuote);
+      el.addEventListener("blur", scheduleQuote);
+    });
+    refreshShippingQuote();
         showError("Enter a valid email.");
         return;
       }

@@ -21,6 +21,7 @@ import {
   annotateDraftPaid,
   createDraftOrder,
   getVariantCatalogPrice,
+  calculateShipping,
   linkExistingDraftOrder,
   type ShippingFields,
 } from "../shopify.js";
@@ -161,6 +162,62 @@ function roundUsd(n: number): number {
 }
 
 const intentsRateLimit = createIpRateLimiter();
+const shippingQuoteRateLimit = createIpRateLimiter({ max: 40, message: "Too many shipping quotes; try again shortly" });
+
+type ShipResult =
+  | { ok: true; line: { title: string; priceUsd: number } | null }
+  | { ok: false; error: string };
+
+async function resolveShipping(
+  variantId: string,
+  quantity: number,
+  shipping: ShippingFields,
+): Promise<ShipResult> {
+  const q = await calculateShipping(variantId, quantity, shipping);
+  if (!q.requiresShipping) return { ok: true, line: null };
+  if (!q.rate) {
+    return {
+      ok: false,
+      error: `Sorry, we can't ship this item to ${shipping.country ?? "that country"} yet.`,
+    };
+  }
+  return { ok: true, line: { title: q.rate.title, priceUsd: roundUsd(q.rate.priceUsd) } };
+}
+
+/** Preview item + shipping totals for buy.html (creates nothing). */
+intentsRouter.post("/shipping-quote", shippingQuoteRateLimit, async (req, res) => {
+  try {
+    const body = (req.body ?? {}) as CreateIntentBody;
+    const variantId = String(body.variantId ?? "").trim();
+    const quantity = Number(body.quantity ?? 1);
+    const shipping = body.shipping ?? {};
+    if (!variantId) {
+      res.status(400).json({ error: "variantId is required" });
+      return;
+    }
+    if (!Number.isFinite(quantity) || quantity < 1 || quantity > config.maxQuantity) {
+      res.status(400).json({ error: `quantity must be 1–${config.maxQuantity}` });
+      return;
+    }
+    const catalog = await getVariantCatalogPrice(variantId);
+    const itemsUsd = roundUsd(catalog.unitPriceUsd * quantity);
+    const ship = await resolveShipping(catalog.variantId, quantity, shipping);
+    if (!ship.ok) {
+      res.status(422).json({ error: ship.error, code: "no_shipping_rate", itemsUsd });
+      return;
+    }
+    const shippingUsd = ship.line?.priceUsd ?? 0;
+    res.json({
+      itemsUsd,
+      shippingUsd,
+      shippingTitle: ship.line?.title ?? null,
+      totalUsd: roundUsd(itemsUsd + shippingUsd),
+    });
+  } catch (err) {
+    console.error("[POST /intents/shipping-quote]", err);
+    res.status(500).json({ error: "failed to quote shipping" });
+  }
+});
 
 intentsRouter.post("/", intentsRateLimit, async (req, res) => {
   try {
@@ -234,6 +291,9 @@ intentsRouter.post("/", intentsRateLimit, async (req, res) => {
       clientAmountYzyIgnored: number | null;
     } | null = null;
 
+    let shippingLine: { title: string; priceUsd: number } | null = null;
+    let itemsUsd: number | null = null;
+
     if (draftOrderId && adminOk) {
       // Admin link path: still require a positive usdAmount from caller (trusted),
       // or derive from variant when provided.
@@ -278,6 +338,14 @@ intentsRouter.post("/", intentsRateLimit, async (req, res) => {
         clientAmountYzyIgnored:
           body.amountYzy != null ? Number(body.amountYzy) : null,
       };
+      const ship = await resolveShipping(catalog.variantId, quantity, shipping);
+      if (!ship.ok) {
+        res.status(422).json({ error: ship.error, code: "no_shipping_rate" });
+        return;
+      }
+      shippingLine = ship.line;
+      itemsUsd = usdAmount;
+      usdAmount = roundUsd(usdAmount + (ship.line?.priceUsd ?? 0));
     }
 
     if (!(usdAmount > 0)) {
@@ -336,6 +404,7 @@ intentsRouter.post("/", intentsRateLimit, async (req, res) => {
           quantity,
           email,
           shipping,
+          shippingLine,
           note: `Pending YzY Solana Pay (${amountYzy} YzY ≈ $${usdAmount})`,
         });
 
@@ -376,6 +445,12 @@ intentsRouter.post("/", intentsRateLimit, async (req, res) => {
       shopifyAdminUrl: draft.adminUrl,
       quote: quoteMeta,
       catalog: catalogMeta,
+      breakdown: {
+        itemsUsd,
+        shippingUsd: shippingLine?.priceUsd ?? 0,
+        shippingTitle: shippingLine?.title ?? null,
+        totalUsd: usdAmount,
+      },
       pricing: {
         serverAuthoritative: true,
         clientUsdAmountIgnored: true,

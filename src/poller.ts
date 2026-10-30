@@ -7,6 +7,7 @@ import {
   listPendingIntents,
   tryMarkConfirmed,
   type IntentRow,
+  updateShopifyOrder,
 } from "./db.js";
 import { annotateDraftPaid, cancelOpenDraftOrder } from "./shopify.js";
 import {
@@ -31,7 +32,10 @@ async function confirmIntent(
     );
     return false;
   }
-  await annotateDraftPaid(row.shopify_draft_order_id ?? "", signature);
+  const done = await annotateDraftPaid(row.shopify_draft_order_id ?? "", signature);
+  if (done?.orderName || done?.orderStatusUrl) {
+    updateShopifyOrder(row.id, done.orderName ?? null, done.orderStatusUrl ?? null);
+  }
   const updated = getIntent(row.id);
   console.info(
     `[poller] confirmed intent ${row.id} via=${via} draft=${updated?.shopify_draft_order_name} sig=${signature}`,

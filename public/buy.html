@@ -311,30 +311,83 @@
           <input id="city" name="city" autocomplete="address-level2" required />
         </div>
         <div class="field">
-          <label for="province">State / province *</label>
-          <input id="province" name="province" autocomplete="address-level1" required placeholder="OR" />
+          <label for="province">State *</label>
+          <select id="province" name="province" autocomplete="address-level1" required>
+            <option value="" selected disabled>Select…</option>
+            <option value="AL">AL</option>
+            <option value="AK">AK</option>
+            <option value="AZ">AZ</option>
+            <option value="AR">AR</option>
+            <option value="CA">CA</option>
+            <option value="CO">CO</option>
+            <option value="CT">CT</option>
+            <option value="DE">DE</option>
+            <option value="DC">DC</option>
+            <option value="FL">FL</option>
+            <option value="GA">GA</option>
+            <option value="HI">HI</option>
+            <option value="ID">ID</option>
+            <option value="IL">IL</option>
+            <option value="IN">IN</option>
+            <option value="IA">IA</option>
+            <option value="KS">KS</option>
+            <option value="KY">KY</option>
+            <option value="LA">LA</option>
+            <option value="ME">ME</option>
+            <option value="MD">MD</option>
+            <option value="MA">MA</option>
+            <option value="MI">MI</option>
+            <option value="MN">MN</option>
+            <option value="MS">MS</option>
+            <option value="MO">MO</option>
+            <option value="MT">MT</option>
+            <option value="NE">NE</option>
+            <option value="NV">NV</option>
+            <option value="NH">NH</option>
+            <option value="NJ">NJ</option>
+            <option value="NM">NM</option>
+            <option value="NY">NY</option>
+            <option value="NC">NC</option>
+            <option value="ND">ND</option>
+            <option value="OH">OH</option>
+            <option value="OK">OK</option>
+            <option value="OR">OR</option>
+            <option value="PA">PA</option>
+            <option value="RI">RI</option>
+            <option value="SC">SC</option>
+            <option value="SD">SD</option>
+            <option value="TN">TN</option>
+            <option value="TX">TX</option>
+            <option value="UT">UT</option>
+            <option value="VT">VT</option>
+            <option value="VA">VA</option>
+            <option value="WA">WA</option>
+            <option value="WV">WV</option>
+            <option value="WI">WI</option>
+            <option value="WY">WY</option>
+            <option value="PR">PR</option>
+          </select>
         </div>
       </div>
       <div class="grid2">
         <div class="field">
-          <label for="zip">ZIP / postal *</label>
+          <label for="zip">ZIP code *</label>
           <input id="zip" name="zip" autocomplete="postal-code" required />
         </div>
         <div class="field">
           <label for="country">Country *</label>
           <select id="country" name="country" required>
             <option value="US" selected>United States</option>
-            <option value="CA">Canada</option>
-            <option value="GB">United Kingdom</option>
-            <option value="AU">Australia</option>
-            <option value="DE">Germany</option>
-            <option value="FR">France</option>
-            <option value="JP">Japan</option>
-            <option value="MX">Mexico</option>
           </select>
         </div>
       </div>
 
+      <!-- TEMPLATE: replace your-store.myshopify.com with your shop domain -->
+      <p class="hint">Printed to order; ships in about 1–2 weeks (US only). See our <a href="https://your-store.myshopify.com/policies/refund-policy" target="_blank" rel="noopener">refund policy</a> and <a href="https://your-store.myshopify.com/policies/terms-of-service" target="_blank" rel="noopener">terms</a>.</p>
+      <div class="field">
+        <label for="phone">Phone (optional, for the carrier)</label>
+        <input id="phone" name="phone" type="tel" autocomplete="tel" placeholder="(555) 555-5555" />
+      </div>
       <p class="hint">next up — the live $YzY quote and QR</p>
       <button class="cta" type="submit" id="submitBtn">Continue to Pay with $YzY</button>
       <div class="err" id="errBox" role="alert"></div>
@@ -474,6 +527,7 @@
         city: document.getElementById("city").value.trim(),
         province: document.getElementById("province").value.trim(),
         zip: document.getElementById("zip").value.trim(),
+        phone: (document.getElementById("phone").value || "").trim() || undefined,
         country: document.getElementById("country").value.trim() || "US",
       };
     }
@@ -524,6 +578,7 @@
         city: document.getElementById("city").value.trim(),
         province: document.getElementById("province").value.trim(),
         zip: document.getElementById("zip").value.trim(),
+        phone: (document.getElementById("phone").value || "").trim() || undefined,
         country: document.getElementById("country").value.trim() || "US",
       };
       if (

@@ -551,6 +551,9 @@
       </p>
     </div>
 
+    <p id="orderLinkBox" class="hint" style="display:none;margin:12px 0"></p>
+    <!-- TEMPLATE: replace your-store.myshopify.com with your shop domain -->
+    <p class="hint" style="margin:8px 0;font-size:.8rem">Printed to order; ships in about 1–2 weeks (US only). See our <a href="https://your-store.myshopify.com/policies/refund-policy" target="_blank" rel="noopener">refund policy</a> and <a href="https://your-store.myshopify.com/policies/terms-of-service" target="_blank" rel="noopener">terms</a>.</p>
     <nav class="footer-links" aria-label="Pay page links">
       <a class="back" data-store-url href="/">Back to shop</a>
       <a class="back" href="https://jup.ag/tokens/4NBTf8PfLH4oLFnwf3knv46FY9i5oXjDxffCetXRpump" target="_blank" rel="noopener noreferrer">Buy YzY 4NBT</a>
@@ -578,9 +581,32 @@
     let countdownTimer = null;
     let expiresAtMs = null;
 
+    let orderLinkTries = 0;
+    async function showOrderLink() {
+      const box = document.getElementById("orderLinkBox");
+      if (!box || !intentId || box.dataset.done) return;
+      try {
+        const r = await fetch("/intents/" + encodeURIComponent(intentId));
+        const d = r.ok ? await r.json() : {};
+        if (d.orderStatusUrl && /^https:\/\//.test(d.orderStatusUrl)) {
+          box.dataset.done = "1";
+          box.textContent = "";
+          box.appendChild(document.createTextNode("Order " + (d.orderName || "") + " created — a confirmation email is on its way. "));
+          const a = document.createElement("a");
+          a.href = d.orderStatusUrl; a.target = "_blank"; a.rel = "noopener";
+          a.textContent = "View your order status →";
+          box.appendChild(a);
+          box.style.display = "block";
+          return;
+        }
+      } catch (_) {}
+      if (++orderLinkTries < 10) setTimeout(showOrderLink, 3000);
+    }
+
     function setStatus(kind, text, label) {
       statusBox.className = "status " + kind;
       statusBox.textContent = text;
+      if (label === "confirmed") showOrderLink();
       if (label) statusLabel.textContent = label;
     }
 

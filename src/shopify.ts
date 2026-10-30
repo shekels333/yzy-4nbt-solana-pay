@@ -45,6 +45,7 @@ export interface DraftOrderResult {
   adminUrl?: string;
   orderId?: string;
   orderName?: string;
+  orderStatusUrl?: string | null;
   raw?: unknown;
 }
 
@@ -308,7 +309,7 @@ export async function createDraftOrder(
         province: shipping.province,
         country: shipping.country ?? "US",
         zip: shipping.zip,
-        phone: shipping.phone,
+        phone: normalizeUsPhone(shipping.phone),
       },
     },
   };
@@ -459,7 +460,7 @@ export async function completeDraftOrder(
         draftOrder {
           id
           name
-          order { id name }
+          order { id name email statusPageUrl }
         }
         userErrors { field message }
       }
@@ -471,7 +472,7 @@ export async function completeDraftOrder(
         draftOrder?: {
           id: string;
           name: string;
-          order?: { id: string; name: string } | null;
+          order?: { id: string; name: string; email?: string | null; statusPageUrl?: string | null } | null;
         } | null;
         userErrors?: { field: string[]; message: string }[];
       };
@@ -496,6 +497,14 @@ export async function completeDraftOrder(
     draft.order?.name ?? "(none)",
   );
 
+  // Draft completion via API does not email the buyer; send Shopify's order
+  // email (receipt with order status link) best-effort — never fail the payment.
+  if (draft.order?.id && draft.order.email) {
+    await sendOrderEmail(draft.order.id, draft.order.email).catch((err) =>
+      console.warn("[shopify] order email failed (order is still paid)", err),
+    );
+  }
+
   return {
     id: draft.id,
     name: draft.name,
@@ -503,8 +512,35 @@ export async function completeDraftOrder(
     adminUrl: adminDraftUrl(draft.id),
     orderId: draft.order?.id,
     orderName: draft.order?.name,
+    orderStatusUrl: draft.order?.statusPageUrl ?? null,
     raw: json,
   };
+}
+
+async function sendOrderEmail(orderId: string, email: string): Promise<void> {
+  const mutation = `
+    mutation orderInvoiceSend($id: ID!, $email: EmailInput) {
+      orderInvoiceSend(id: $id, email: $email) {
+        order { id }
+        userErrors { field message }
+      }
+    }
+  `;
+  const json = await shopifyGraphql<{
+    data?: { orderInvoiceSend?: { userErrors?: { field: string[]; message: string }[] } };
+    errors?: { message: string }[];
+  }>(mutation, {
+    id: orderId,
+    email: {
+      to: email,
+      subject: "Your order — paid with YzY",
+      customMessage:
+        "Thanks for paying with YzY! Your payment is confirmed. Items are printed to order and ship in about 1–2 weeks (US only). Use the link in this email to check your order status.",
+    },
+  });
+  const errs = json.errors ?? json.data?.orderInvoiceSend?.userErrors ?? [];
+  if (errs.length) throw new Error(JSON.stringify(errs));
+  console.info("[shopify] order email sent", orderId);
 }
 
 /**
@@ -604,10 +640,10 @@ export async function cancelOpenDraftOrder(
 export async function annotateDraftPaid(
   draftOrderId: string,
   signature: string,
-): Promise<void> {
+): Promise<DraftOrderResult | null> {
   if (!draftOrderId) {
     console.warn("[shopify] annotateDraftPaid: no draftOrderId");
-    return;
+    return null;
   }
   if (!shopifyEnabled || draftOrderId.startsWith("stub-")) {
     console.info(
@@ -617,9 +653,9 @@ export async function annotateDraftPaid(
       "sig",
       signature.slice(0, 16) + "…",
     );
-    return;
+    return null;
   }
-  await completeDraftOrder(draftOrderId, signature);
+  return completeDraftOrder(draftOrderId, signature);
 }
 
 
@@ -694,4 +730,12 @@ export async function calculateShipping(
     .filter((r) => Number.isFinite(r.priceUsd) && r.priceUsd >= 0)
     .sort((a, b) => a.priceUsd - b.priceUsd);
   return { requiresShipping: true, rate: rates[0] ?? null };
+}
+
+/** Optional buyer phone → E.164 (+1XXXXXXXXXX) for carriers; drop anything else. */
+function normalizeUsPhone(raw: unknown): string | undefined {
+  if (typeof raw !== "string") return undefined;
+  let d = raw.replace(/\D/g, "");
+  if (d.length === 11 && d.startsWith("1")) d = d.slice(1);
+  return d.length === 10 ? `+1${d}` : undefined;
 }

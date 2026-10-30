@@ -28,6 +28,8 @@ export interface IntentRow {
   created_at: number;
   updated_at: number;
   expires_at: number;
+  shopify_order_name?: string | null;
+  order_status_url?: string | null;
 }
 
 const db = new Database(config.dbPath);
@@ -65,6 +67,8 @@ function ensureColumn(name: string, ddl: string): void {
 ensureColumn("usd_amount", "usd_amount REAL");
 ensureColumn("price_usd", "price_usd REAL");
 ensureColumn("quoted_at", "quoted_at INTEGER");
+ensureColumn("shopify_order_name", "shopify_order_name TEXT");
+ensureColumn("order_status_url", "order_status_url TEXT");
 
 /** One confirmed intent per on-chain signature (NULLs allowed for pending). */
 db.exec(
@@ -190,6 +194,18 @@ export function markConfirmed(
   now = Date.now(),
 ): void {
   tryMarkConfirmed(id, signature, now);
+}
+
+/** Record the completed Shopify order (name + customer order-status page). */
+export function updateShopifyOrder(
+  id: string,
+  orderName: string | null,
+  orderStatusUrl: string | null,
+  now = Date.now(),
+): void {
+  db.prepare(
+    `UPDATE intents SET shopify_order_name = ?, order_status_url = ?, updated_at = ? WHERE id = ?`,
+  ).run(orderName, orderStatusUrl, now, id);
 }
 
 export function updateShopifyDraft(

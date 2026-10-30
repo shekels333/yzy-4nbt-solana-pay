@@ -15,6 +15,7 @@ import {
   tryMarkConfirmed,
   updatePendingQuote,
   type IntentRow,
+  updateShopifyOrder,
 } from "../db.js";
 import { quoteUsdInYzy } from "../price.js";
 import {
@@ -75,6 +76,8 @@ function publicIntent(row: IntentRow, extra?: Record<string, unknown>) {
     payPageUrl: `${config.publicBaseUrl}/pay.html?intent=${row.id}`,
     shopifyDraftOrderId: row.shopify_draft_order_id,
     shopifyDraftOrderName: row.shopify_draft_order_name,
+    orderName: row.shopify_order_name ?? null,
+    orderStatusUrl: row.order_status_url ?? null,
     signature: row.signature,
     createdAt: row.created_at,
     expiresAt: row.expires_at,
@@ -602,7 +605,10 @@ intentsRouter.post("/:id/confirm", async (req, res) => {
       res.json({ ...publicIntent(latest), checked: true, found: latest.status === "confirmed" });
       return;
     }
-    await annotateDraftPaid(row.shopify_draft_order_id ?? "", signature);
+    const done = await annotateDraftPaid(row.shopify_draft_order_id ?? "", signature);
+  if (done?.orderName || done?.orderStatusUrl) {
+    updateShopifyOrder(row.id, done.orderName ?? null, done.orderStatusUrl ?? null);
+  }
     const updated = getIntent(row.id)!;
     res.json({ ...publicIntent(updated), checked: true, found: true, via });
   } catch (err) {
